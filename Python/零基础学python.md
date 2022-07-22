@@ -1318,15 +1318,76 @@ print(p.search('aa2022-08-10bb').groups()) # (2022,08,10)
 
 sub findall
 
+```
+# print (p.search('aa2018-05-10bb'))
+# phone = '123-456-789 # 这是电话号码'
+# p2 = re.sub(r'#.*$','',phone)
+# print(p2)
+# p3 = re.sub(r'\D','',p2)
+# print(p3)
+# findall()
+```
+
 ### 日期与时间函数库
 
 time
 
 datetime
 
+```python
+import time
+# print(time.time())
+# print(time.localtime())
+# print(time.strftime('%Y%m%d'))
+
+
+import datetime
+print(datetime.datetime.now())
+newtime = datetime.timedelta(minutes=10)
+print(datetime.datetime.now()+ newtime)
+
+one_day=datetime.datetime(2008,5,27)
+new_date=datetime.timedelta(days=10)
+print( one_day + new_date)
+```
+
+
+
 ### 数学相关库
 
+math
+
+random
+
+```python
+import  random
+print( random.randint(1,5))
+print( random.choice(['aa','bb','cc']))
+```
+
 ### 使用命令行对文件和文件夹操作
+
+os.path
+
+Path lib
+
+```python
+import  os
+print( os.path.abspath('..'))
+print( os.path.exists('/Users'))
+print( os.path.isdir('/Users'))
+os.path.join('/tmp/a/','b/c')
+
+from pathlib import Path
+p = Path('.')
+print ( p.resolve())
+
+p.is_dir()
+
+q = Path('/tmp/a/b/c')
+
+Path.mkdir(q,parents=True)
+```
 
 ### 文件与目录操作库
 
