@@ -9254,9 +9254,248 @@ parser.feed('''<html>
 
 ### Pillow
 
-#### requests
+PIL：Python Imaging Library，已经是Python平台事实上的图像处理标准库了。PIL功能非常强大，但API却非常简单易用。
 
+由于PIL仅支持到Python 2.7，加上年久失修，于是一群志愿者在PIL的基础上创建了兼容的版本，名字叫[Pillow](https://github.com/python-pillow/Pillow)，支持最新Python 3.x，又加入了许多新特性，因此，我们可以直接安装使用Pillow。
 
+**安装Pillow**
+
+如果安装了Anaconda，Pillow就已经可用了。否则，需要在命令行下通过pip安装：
+
+```bash
+$ pip install pillow
+```
+
+如果遇到`Permission denied`安装失败，请加上`sudo`重试。
+
+**操作图像**
+
+来看看最常见的图像缩放操作，只需三四行代码：
+
+```python
+from PIL import Image
+
+# 打开一个jpg图像文件，注意是当前路径:
+im = Image.open('test.jpg')
+# 获得图像尺寸:
+w, h = im.size
+print('Original image size: %sx%s' % (w, h))
+# 缩放到50%:
+im.thumbnail((w//2, h//2))
+print('Resize image to: %sx%s' % (w//2, h//2))
+# 把缩放后的图像用jpeg格式保存:
+im.save('thumbnail.jpg', 'jpeg')
+```
+
+其他功能如切片、旋转、滤镜、输出文字、调色板等一应俱全。
+
+比如，模糊效果也只需几行代码：
+
+```python
+from PIL import Image, ImageFilter
+
+# 打开一个jpg图像文件，注意是当前路径:
+im = Image.open('test.jpg')
+# 应用模糊滤镜:
+im2 = im.filter(ImageFilter.BLUR)
+im2.save('blur.jpg', 'jpeg')
+```
+
+PIL的`ImageDraw`提供了一系列绘图方法，让我们可以直接绘图。比如要生成字母验证码图片：
+
+```python
+from PIL import Image, ImageDraw, ImageFont, ImageFilter
+
+import random
+
+# 随机字母:
+def rndChar():
+    return chr(random.randint(65, 90))
+
+# 随机颜色1:
+def rndColor():
+    return (random.randint(64, 255), random.randint(64, 255), random.randint(64, 255))
+
+# 随机颜色2:
+def rndColor2():
+    return (random.randint(32, 127), random.randint(32, 127), random.randint(32, 127))
+
+# 240 x 60:
+width = 60 * 4
+height = 60
+image = Image.new('RGB', (width, height), (255, 255, 255))
+# 创建Font对象:
+font = ImageFont.truetype('Arial.ttf', 36)
+# 创建Draw对象:
+draw = ImageDraw.Draw(image)
+# 填充每个像素:
+for x in range(width):
+    for y in range(height):
+        draw.point((x, y), fill=rndColor())
+# 输出文字:
+for t in range(4):
+    draw.text((60 * t + 10, 10), rndChar(), font=font, fill=rndColor2())
+# 模糊:
+image = image.filter(ImageFilter.BLUR)
+image.save('code.jpg', 'jpeg')
+```
+
+我们用随机颜色填充背景，再画上文字，最后对图像进行模糊，得到验证码图片如下：
+
+![pil-code](./imgs_study/pil-code.jpg)
+
+### requests
+
+我们已经讲解了Python内置的urllib模块，用于访问网络资源。但是，它用起来比较麻烦，而且，缺少很多实用的高级功能。
+
+更好的方案是使用requests。它是一个Python第三方库，处理URL资源特别方便。
+
+**安装requests**
+
+```
+pip install requests
+```
+
+**使用requests**
+
+要通过GET访问一个页面，只需要几行代码：
+
+```python
+import requests
+r = requests.get('https://www.douban.com/', headers={
+    "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:105.0) Gecko/20100101 Firefox/105.0"
+})
+print(r.status_code)
+print(r.text)
+```
+
+运行结果
+
+```
+200
+
+<!DOCTYPE HTML>
+<html lang="zh-cmn-Hans" class="ua-mac ua-ff10">
+<head>
+<meta charset="UTF-8">
+<meta name="google-site-verification" content="ok0wCgT20tBBgo9_zat2iAcimtN4Ftf5ccsh092Xeyw" />
+<meta name="description" content="提供图书、电影、音乐唱片的推荐、评论和价格比较，以及城市独特的文化生活。">
+<meta name="keywords" content="豆瓣,小组,电影,同城,豆品,广播,登录豆瓣">
+....
+```
+
+因为豆瓣加入了反扒机制，请求的时候加入了headers的User-Agent参数
+
+对于带参数的URL，传入一个dict作为`params`参数：
+
+```python
+r = requests.get('https://www.douban.com/search', params={'q': 'python', 'cat': '1001'}, headers={
+    "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:105.0) Gecko/20100101 Firefox/105.0"
+})
+print(r.url)  #  实际请求的URL
+# https://www.douban.com/search?q=python&cat=1001
+```
+
+requests自动检测编码，可以使用`encoding`属性查看：
+
+```python
+print(r.encoding)  # utf-8
+```
+
+无论响应是文本还是二进制内容，我们都可以用`content`属性获得`bytes`对象：
+
+```python
+print(r.content) # b'<!DOCTYPE html>\n<html lang="zh-CN" class="ua-mac ua-ff10">\n<head>\n    ....
+```
+
+requests的方便之处还在于，对于特定类型的响应，例如JSON，可以直接获取：
+
+···
+
+```
+>>> r = requests.get('https://query.yahooapis.com/v1/public/yql?q=select%20*%20from%20weather.forecast%20where%20woeid%20%3D%202151330&format=json')
+>>> r.json()
+{'query': {'count': 1, 'created': '2017-11-17T07:14:12Z', ...
+```
+
+需要传入HTTP Header时，我们传入一个dict作为`headers`参数：
+
+```
+>>> r = requests.get('https://www.douban.com/', headers={'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 11_0 like Mac OS X) AppleWebKit'})
+>>> r.text
+'<!DOCTYPE html>\n<html>\n<head>\n<meta charset="UTF-8">\n <title>豆瓣(手机版)</title>...'
+```
+
+要发送POST请求，只需要把`get()`方法变成`post()`，然后传入`data`参数作为POST请求的数据：
+
+```
+>>> r = requests.post('https://accounts.douban.com/login', data={'form_email': 'abc@example.com', 'form_password': '123456'})
+```
+
+requests默认使用`application/x-www-form-urlencoded`对POST数据编码。如果要传递JSON数据，可以直接传入json参数：
+
+```
+params = {'key': 'value'}
+r = requests.post(url, json=params) # 内部自动序列化为JSON
+```
+
+类似的，上传文件需要更复杂的编码格式，但是requests把它简化成`files`参数：
+
+```
+>>> upload_files = {'file': open('report.xls', 'rb')}
+>>> r = requests.post(url, files=upload_files)
+```
+
+在读取文件时，注意务必使用`'rb'`即二进制模式读取，这样获取的`bytes`长度才是文件的长度。
+
+把`post()`方法替换为`put()`，`delete()`等，就可以以PUT或DELETE方式请求资源。
+
+除了能轻松获取响应内容外，requests对获取HTTP响应的其他信息也非常简单。例如，获取响应头：
+
+```
+>>> r.headers
+{Content-Type': 'text/html; charset=utf-8', 'Transfer-Encoding': 'chunked', 'Content-Encoding': 'gzip', ...}
+>>> r.headers['Content-Type']
+'text/html; charset=utf-8'
+```
+
+requests对Cookie做了特殊处理，使得我们不必解析Cookie就可以轻松获取指定的Cookie：
+
+```
+>>> r.cookies['ts']
+'example_cookie_12345'
+```
+
+要在请求中传入Cookie，只需准备一个dict传入`cookies`参数：
+
+```
+>>> cs = {'token': '12345', 'status': 'working'}
+>>> r = requests.get(url, cookies=cs)
+```
+
+最后，要指定超时，传入以秒为单位的timeout参数：
+
+```
+>>> r = requests.get(url, timeout=2.5) # 2.5秒后超时
+```
+
+### chardet
+
+字符串编码一直是令人非常头疼的问题，尤其是我们在处理一些不规范的第三方网页的时候。虽然Python提供了Unicode表示的`str`和`bytes`两种数据类型，并且可以通过`encode()`和`decode()`方法转换，但是，在不知道编码的情况下，对`bytes`做`decode()`不好做。
+
+对于未知编码的`bytes`，要把它转换成`str`，需要先“猜测”编码。猜测的方式是先收集各种编码的特征字符，根据特征字符判断，就能有很大概率“猜对”。
+
+当然，我们肯定不能从头自己写这个检测编码的功能，这样做费时费力。chardet这个第三方库正好就派上了用场。用它来检测编码，简单易用。
+
+**安装chardet**
+
+如果安装了Anaconda，chardet就已经可用了。否则，需要在命令行下通过pip安装：
+
+```
+pip install chardet
+```
+
+**使用chardet**
 
 ## venv
 
