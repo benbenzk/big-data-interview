@@ -9497,9 +9497,908 @@ pip install chardet
 
 **使用chardet**
 
+当我们拿到一个`bytes`时，就可以对其检测编码。用chardet检测编码，只需要一行代码：
+
+```python
+print(chardet.detect(b'Hello, world!'))
+# {'encoding': 'ascii', 'confidence': 1.0, 'language': ''}
+```
+
+检测出的编码是`ascii`，注意到还有个`confidence`字段，表示检测的概率是1.0（即100%）。
+
+我们来试试检测GBK编码的中文：
+
+```python
+data = '离离原上草，一岁一枯荣'.encode('gbk')
+print(chardet.detect(data))
+# {'encoding': 'GB2312', 'confidence': 0.7407407407407407, 'language': 'Chinese'}
+```
+
+我们再试试对日文进行检测：
+
+```python
+data = '最新の主要ニュース'.encode('euc-jp')
+print(chardet.detect(data))
+# {'encoding': 'EUC-JP', 'confidence': 0.99, 'language': 'Japanese'}
+```
+
+可见，用chardet检测编码，使用简单。获取到编码后，再转换为`str`，就可以方便后续处理。
+
+chardet支持检测的编码列表请参考官方文档[Supported encodings](https://chardet.readthedocs.io/en/latest/supported-encodings.html)。
+
+**小结**
+
+使用chardet检测编码非常容易，chardet支持检测中文、日文、韩文等多种语言。
+
+### psutil
+
+用Python来编写脚本简化日常的运维工作是Python的一个重要用途。在Linux下，有许多系统命令可以让我们时刻监控系统运行的状态，如`ps`，`top`，`free`等等。要获取这些系统信息，Python可以通过`subprocess`模块调用并获取结果。但这样做显得很麻烦，尤其是要写很多解析代码。
+
+在Python中获取系统信息的另一个好办法是使用`psutil`这个第三方模块。顾名思义，psutil = process and system utilities，它不仅可以通过一两行代码实现系统监控，还可以跨平台使用，支持Linux／UNIX／OSX／Windows等，是系统管理员和运维小伙伴不可或缺的必备模块。
+
+**安装psutil**
+
+```
+$ pip install psutil
+```
+
+1. 获取CPU信息
+
+   ```python
+   import psutil
+   
+   print(psutil.cpu_count())  # CPU逻辑数量
+   print(psutil.cpu_count(logical=False))  # CPU物理核心
+   ```
+
+   统计CPU的用户／系统／空闲时间
+
+   ```python
+   print(psutil.cpu_times())
+   # scputimes(user=16566.03, nice=0.0, system=18455.41, idle=273820.56)
+   ```
+
+   再实现类似`top`命令的CPU使用率，每秒刷新一次，累计10次：
+
+   ```python
+   for x in range(10):
+       print(psutil.cpu_percent(interval=1, percpu=True))
+   ```
+
+2. 获取内存信息
+
+   使用psutil获取物理内存和交换内存信息，分别使用：
+
+   ```
+   >>> psutil.virtual_memory()
+   svmem(total=8589934592, available=2866520064, percent=66.6, used=7201386496, free=216178688, active=3342192640, inactive=2650341376, wired=1208852480)
+   >>> psutil.swap_memory()
+   sswap(total=1073741824, used=150732800, free=923009024, percent=14.0, sin=10705981440, sout=40353792)
+   ```
+
+   返回的是字节为单位的整数，可以看到，总内存大小是8589934592 = 8 GB，已用7201386496 = 6.7 GB，使用了66.6%。
+
+   而交换区大小是1073741824 = 1 GB。
+
+3. 获取磁盘信息
+
+   可以通过psutil获取磁盘分区、磁盘使用率和磁盘IO信息：
+
+   ```
+   >>> psutil.disk_partitions() # 磁盘分区信息
+   [sdiskpart(device='/dev/disk1', mountpoint='/', fstype='hfs', opts='rw,local,rootfs,dovolfs,journaled,multilabel')]
+   >>> psutil.disk_usage('/') # 磁盘使用情况
+   sdiskusage(total=998982549504, used=390880133120, free=607840272384, percent=39.1)
+   >>> psutil.disk_io_counters() # 磁盘IO
+   sdiskio(read_count=988513, write_count=274457, read_bytes=14856830464, write_bytes=17509420032, read_time=2228966, write_time=1618405)
+   ```
+
+   可以看到，磁盘`'/'`的总容量是998982549504 = 930 GB，使用了39.1%。文件格式是HFS，`opts`中包含`rw`表示可读写，`journaled`表示支持日志。
+
+4. 获取网络信息
+
+   psutil可以获取网络接口和网络连接信息：
+
+   ```
+   >>> psutil.net_io_counters() # 获取网络读写字节／包的个数
+   snetio(bytes_sent=3885744870, bytes_recv=10357676702, packets_sent=10613069, packets_recv=10423357, errin=0, errout=0, dropin=0, dropout=0)
+   >>> psutil.net_if_addrs() # 获取网络接口信息
+   {
+     'lo0': [snic(family=<AddressFamily.AF_INET: 2>, address='127.0.0.1', netmask='255.0.0.0'), ...],
+     'en1': [snic(family=<AddressFamily.AF_INET: 2>, address='10.0.1.80', netmask='255.255.255.0'), ...],
+     'en0': [...],
+     'en2': [...],
+     'bridge0': [...]
+   }
+   >>> psutil.net_if_stats() # 获取网络接口状态
+   {
+     'lo0': snicstats(isup=True, duplex=<NicDuplex.NIC_DUPLEX_UNKNOWN: 0>, speed=0, mtu=16384),
+     'en0': snicstats(isup=True, duplex=<NicDuplex.NIC_DUPLEX_UNKNOWN: 0>, speed=0, mtu=1500),
+     'en1': snicstats(...),
+     'en2': snicstats(...),
+     'bridge0': snicstats(...)
+   }
+   ```
+
+   要获取当前网络连接信息，使用`net_connections()`：
+
+   ```
+   >>> psutil.net_connections()
+   Traceback (most recent call last):
+     ...
+   PermissionError: [Errno 1] Operation not permitted
+   
+   During handling of the above exception, another exception occurred:
+   
+   Traceback (most recent call last):
+     ...
+   psutil.AccessDenied: psutil.AccessDenied (pid=3847)
+   ```
+
+   你可能会得到一个`AccessDenied`错误，原因是psutil获取信息也是要走系统接口，而获取网络连接信息需要root权限，这种情况下，可以退出Python交互环境，用`sudo`重新启动：
+
+   ```
+   $ sudo python3
+   Password: ******
+   Python 3.8 ... on darwin
+   Type "help", ... for more information.
+   >>> import psutil
+   >>> psutil.net_connections()
+   [
+       sconn(fd=83, family=<AddressFamily.AF_INET6: 30>, type=1, laddr=addr(ip='::127.0.0.1', port=62911), raddr=addr(ip='::127.0.0.1', port=3306), status='ESTABLISHED', pid=3725),
+       sconn(fd=84, family=<AddressFamily.AF_INET6: 30>, type=1, laddr=addr(ip='::127.0.0.1', port=62905), raddr=addr(ip='::127.0.0.1', port=3306), status='ESTABLISHED', pid=3725),
+       sconn(fd=93, family=<AddressFamily.AF_INET6: 30>, type=1, laddr=addr(ip='::', port=8080), raddr=(), status='LISTEN', pid=3725),
+       sconn(fd=103, family=<AddressFamily.AF_INET6: 30>, type=1, laddr=addr(ip='::127.0.0.1', port=62918), raddr=addr(ip='::127.0.0.1', port=3306), status='ESTABLISHED', pid=3725),
+       sconn(fd=105, family=<AddressFamily.AF_INET6: 30>, type=1, ..., pid=3725),
+       sconn(fd=106, family=<AddressFamily.AF_INET6: 30>, type=1, ..., pid=3725),
+       sconn(fd=107, family=<AddressFamily.AF_INET6: 30>, type=1, ..., pid=3725),
+       ...
+       sconn(fd=27, family=<AddressFamily.AF_INET: 2>, type=2, ..., pid=1)
+   ]
+   ```
+
+5. 获取进程信息
+
+   通过psutil可以获取到所有进程的详细信息：
+
+   ```
+   >>> psutil.pids() # 所有进程ID
+   [3865, 3864, 3863, 3856, 3855, 3853, 3776, ..., 45, 44, 1, 0]
+   >>> p = psutil.Process(3776) # 获取指定进程ID=3776，其实就是当前Python交互环境
+   >>> p.name() # 进程名称
+   'python3.6'
+   >>> p.exe() # 进程exe路径
+   '/Users/michael/anaconda3/bin/python3.6'
+   >>> p.cwd() # 进程工作目录
+   '/Users/michael'
+   >>> p.cmdline() # 进程启动的命令行
+   ['python3']
+   >>> p.ppid() # 父进程ID
+   3765
+   >>> p.parent() # 父进程
+   <psutil.Process(pid=3765, name='bash') at 4503144040>
+   >>> p.children() # 子进程列表
+   []
+   >>> p.status() # 进程状态
+   'running'
+   >>> p.username() # 进程用户名
+   'michael'
+   >>> p.create_time() # 进程创建时间
+   1511052731.120333
+   >>> p.terminal() # 进程终端
+   '/dev/ttys002'
+   >>> p.cpu_times() # 进程使用的CPU时间
+   pcputimes(user=0.081150144, system=0.053269812, children_user=0.0, children_system=0.0)
+   >>> p.memory_info() # 进程使用的内存
+   pmem(rss=8310784, vms=2481725440, pfaults=3207, pageins=18)
+   >>> p.open_files() # 进程打开的文件
+   []
+   >>> p.connections() # 进程相关网络连接
+   []
+   >>> p.num_threads() # 进程的线程数量
+   1
+   >>> p.threads() # 所有线程信息
+   [pthread(id=1, user_time=0.090318, system_time=0.062736)]
+   >>> p.environ() # 进程环境变量
+   {'SHELL': '/bin/bash', 'PATH': '/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:...', 'PWD': '/Users/michael', 'LANG': 'zh_CN.UTF-8', ...}
+   >>> p.terminate() # 结束进程
+   Terminated: 15 <-- 自己把自己结束了
+   ```
+
+   ```
+   
+   ```
+
+   和获取网络连接类似，获取一个root用户的进程需要root权限，启动Python交互环境或者`.py`文件时，需要`sudo`权限。
+
+   psutil还提供了一个`test()`函数，可以模拟出`ps`命令的效果：
+
+   ```
+   $ sudo python3
+   Password: ******
+   Python 3.6.3 ... on darwin
+   Type "help", ... for more information.
+   >>> import psutil
+   >>> psutil.test()
+   USER         PID %MEM     VSZ     RSS TTY           START    TIME  COMMAND
+   root           0 24.0 74270628 2016380 ?             Nov18   40:51  kernel_task
+   root           1  0.1 2494140    9484 ?             Nov18   01:39  launchd
+   root          44  0.4 2519872   36404 ?             Nov18   02:02  UserEventAgent
+   root          45    ? 2474032    1516 ?             Nov18   00:14  syslogd
+   root          47  0.1 2504768    8912 ?             Nov18   00:03  kextd
+   root          48  0.1 2505544    4720 ?             Nov18   00:19  fseventsd
+   _appleeven    52  0.1 2499748    5024 ?             Nov18   00:00  appleeventsd
+   root          53  0.1 2500592    6132 ?             Nov18   00:02  configd
+   ...
+   ```
+
+   **小结**
+
+   psutil使得Python程序获取系统信息变得易如反掌。
+
+   psutil还可以获取用户信息、Windows服务等很多有用的系统信息，具体请参考psutil的官网：https://github.com/giampaolo/psutil
+
 ## venv
 
+在开发Python应用程序的时候，系统安装的Python3只有一个版本：3.10。所有第三方的包都会被`pip`安装到Python3的`site-packages`目录下。
+
+如果我们要同时开发多个应用程序，那这些应用程序都会共用一个Python，就是安装在系统的Python 3。如果应用A需要jinja 2.7，而应用B需要jinja 2.6怎么办？
+
+这种情况下，每个应用可能需要各自拥有一套“独立”的Python运行环境。venv就是用来为一个应用创建一套“隔离”的Python运行环境。
+
+首先，我们假定要开发一个新的项目`project101`，需要一套独立的Python运行环境，可以这么做：
+
+第一步，创建目录，这里把venv命名为`proj101env`，因此目录名为`proj101env`：
+
+```
+% mkdir proj101env
+% cd proj101env
+```
+
+第二步，创建一个独立的Python运行环境：
+
+```
+% python3 -m venv .
+```
+
+查看当前目录，可以发现有几个文件夹和一个`pyvenv.cfg`文件：
+
+```
+% ls
+bin		include		lib		pyvenv.cfg
+```
+
+命令`python3 -m venv <目录>`就可以创建一个独立的Python运行环境。观察`bin`目录的内容，里面有`python3`、`pip3`等可执行文件，实际上是链接到Python系统目录的软链接。
+
+继续进入`bin`目录，Linux/Mac用`source activate`，Windows用`activate.bat`激活该venv环境：
+
+```
+benbenpy@192 proj101env % cd bin
+benbenpy@192 bin % source activate
+(proj101env) benbenpy@192 bin %
+```
+
+注意到命令提示符变了，有个`(proj101env)`前缀，表示当前环境是一个名为`proj101env`的Python环境。
+
+下面正常安装各种第三方包，并运行`python`命令：
+
+```
+(proj101env) benbenpy@192 bin % pip3 install jinja2
+...
+Successfully installed MarkupSafe-2.1.1 jinja2-3.1.2
+(proj101env) benbenpy@192 bin % python3
+Python 3.8.5 (v3.8.5:580fbb018f, Jul 20 2020, 12:11:27)
+[Clang 6.0 (clang-600.0.57)] on darwin
+Type "help", "copyright", "credits" or "license" for more information.
+>>> import jinja2
+>>> exit()
+```
+
+在`venv`环境下，用`pip`安装的包都被安装到`proj101env`这个环境下，具体目录是`proj101env/lib/python3.x/site-packages`，因此，系统Python环境不受任何影响。也就是说，`proj101env`环境是专门针对`project101`这个应用创建的。
+
+退出当前的`proj101env`环境，使用`deactivate`命令：
+
+```
+(proj101env) benbenpy@192 bin % deactivate
+benbenpy@192 bin %
+```
+
 ## 图形界面
+
+Python支持多种图形界面的第三方库，包括：
+
+- Tk
+- wxWidgets
+- Qt
+- GTK
+
+等等。
+
+但是Python自带的库是支持Tk的Tkinter，使用Tkinter，无需安装任何包，就可以直接使用。本章简单介绍如何使用Tkinter进行GUI编程。
+
+**Tkinter**
+
+我们来梳理一下概念：
+
+我们编写的Python代码会调用内置的Tkinter，Tkinter封装了访问Tk的接口；
+
+Tk是一个图形库，支持多个操作系统，使用Tcl语言开发；
+
+Tk会调用操作系统提供的本地GUI接口，完成最终的GUI。
+
+所以，我们的代码只需要调用Tkinter提供的接口就可以了。
+
+**第一个GUI程序**
+
+使用Tkinter十分简单，我们来编写一个GUI版本的“Hello, world!”。
+
+第一步是导入Tkinter包的所有内容：
+
+```
+from tkinter import *
+```
+
+第二步是从`Frame`派生一个`Application`类，这是所有Widget的父容器：
+
+```python
+class Application(Frame):
+    def __init__(self, master=None):
+        Frame.__init__(self, master)
+        self.pack()
+        self.createWidgets()
+
+    def createWidgets(self):
+        self.helloLabel = Label(self, text='Hello, world!')
+        self.helloLabel.pack()
+        self.quitButton = Button(self, text='Quit', command=self.quit)
+        self.quitButton.pack()
+```
+
+在GUI中，每个Button、Label、输入框等，都是一个Widget。Frame则是可以容纳其他Widget的Widget，所有的Widget组合起来就是一棵树。
+
+`pack()`方法把Widget加入到父容器中，并实现布局。`pack()`是最简单的布局，`grid()`可以实现更复杂的布局。
+
+在`createWidgets()`方法中，我们创建一个`Label`和一个`Button`，当Button被点击时，触发`self.quit()`使程序退出。
+
+第三步，实例化`Application`，并启动消息循环：
+
+```python
+app = Application()
+# 设置窗口标题:
+app.master.title('Hello World')
+# 主消息循环:
+app.mainloop()
+```
+
+GUI程序的主线程负责监听来自操作系统的消息，并依次处理每一条消息。因此，如果消息处理非常耗时，就需要在新线程中处理。
+
+运行这个GUI程序，可以看到下面的窗口：
+
+![tk-hello-world](./imgs_study/tkinter_hello.png)
+
+点击“Quit”按钮或者窗口的“x”结束程序。
+
+**输入文本**
+
+我们再对这个GUI程序改进一下，加入一个文本框，让用户可以输入文本，然后点按钮后，弹出消息对话框。
+
+```python
+from tkinter import *
+import tkinter.messagebox as messagebox
+
+class Application(Frame):
+    def __init__(self, master=None):
+        Frame.__init__(self, master)
+        self.pack()
+        self.createWidgets()
+
+    def createWidgets(self):
+        self.nameInput = Entry(self)
+        self.nameInput.pack()
+        self.alertButton = Button(self, text='Hello', command=self.hello)
+        self.alertButton.pack()
+
+    def hello(self):
+        name = self.nameInput.get() or 'world'
+        messagebox.showinfo('Message', 'Hello, %s' % name)
+
+app = Application()
+# 设置窗口标题:
+app.master.title('Hello World')
+# 主消息循环:
+app.mainloop()
+```
+
+当用户点击按钮时，触发`hello()`，通过`self.nameInput.get()`获得用户输入的文本后，使用`tkMessageBox.showinfo()`可以弹出消息对话框。
+
+程序运行结果如下：
+
+![tk-say-hello](./imgs_study/tkinter_say_hello.png)
+
+**小结**
+
+Python内置的Tkinter可以满足基本的GUI程序的要求，如果是非常复杂的GUI程序，建议用操作系统原生支持的语言和库来编写。
+
+### 海龟绘图 Turtle
+
+在1966年，Seymour Papert和Wally Feurzig发明了一种专门给儿童学习编程的语言——[LOGO语言](https://baike.baidu.com/item/logo/4689862)，它的特色就是通过编程指挥一个小海龟（turtle）在屏幕上绘图。
+
+海龟绘图（Turtle Graphics）后来被移植到各种高级语言中，Python内置了turtle库，基本上100%复制了原始的Turtle Graphics的所有功能。
+
+我们来看一个指挥小海龟绘制一个长方形的简单代码：
+
+```python
+# 导入turtle包的所有内容:
+from turtle import *
+
+# 设置笔刷宽度:
+width(4)
+
+# 前进:
+forward(200)
+# 右转90度:
+right(90)
+
+# 笔刷颜色:
+pencolor('red')
+forward(100)
+right(90)
+
+pencolor('green')
+forward(200)
+right(90)
+
+pencolor('blue')
+forward(100)
+right(90)
+
+# 调用done()使得窗口等待被关闭，否则将立刻关闭窗口:
+done()
+```
+
+从程序代码可以看出，海龟绘图就是指挥海龟前进、转向，海龟移动的轨迹就是绘制的线条。要绘制一个长方形，只需要让海龟前进、右转90度，反复4次。
+
+调用`width()`函数可以设置笔刷宽度，调用`pencolor()`函数可以设置颜色。更多操作请参考[turtle库](https://docs.python.org/3.3/library/turtle.html#turtle-methods)的说明。
+
+绘图完成后，记得调用`done()`函数，让窗口进入消息循环，等待被关闭。否则，由于Python进程会立刻结束，将导致窗口被立刻关闭。
+
+`turtle`包本身只是一个绘图库，但是配合Python代码，就可以绘制各种复杂的图形。例如，通过循环绘制5个五角星：
+
+```python
+from turtle import *
+
+def drawStar(x, y):
+    pu()
+    goto(x, y)
+    pd()
+    # set heading: 0
+    seth(0)
+    for i in range(5):
+        fd(40)
+        rt(144)
+
+for x in range(0, 250, 50):
+    drawStar(x, 0)
+
+done()
+```
+
+使用递归，可以绘制出非常复杂的图形。例如，下面的代码可以绘制一棵分型树：
+
+```python
+from turtle import *
+
+# 设置色彩模式是RGB:
+colormode(255)
+
+lt(90)
+
+lv = 14
+l = 120
+s = 45
+
+width(lv)
+
+# 初始化RGB颜色:
+r = 0
+g = 0
+b = 0
+pencolor(r, g, b)
+
+penup()
+bk(l)
+pendown()
+fd(l)
+
+def draw_tree(l, level):
+    global r, g, b
+    # save the current pen width
+    w = width()
+
+    # narrow the pen width
+    width(w * 3.0 / 4.0)
+    # set color:
+    r = r + 1
+    g = g + 2
+    b = b + 3
+    pencolor(r % 200, g % 200, b % 200)
+
+    l = 3.0 / 4.0 * l
+
+    lt(s)
+    fd(l)
+
+    if level < lv:
+        draw_tree(l, level + 1)
+    bk(l)
+    rt(2 * s)
+    fd(l)
+
+    if level < lv:
+        draw_tree(l, level + 1)
+    bk(l)
+    lt(s)
+
+    # restore the previous pen width
+    width(w)
+
+speed("fastest")
+
+draw_tree(l, 4)
+
+done()
+```
+
+## 网络编程
+
+自从互联网诞生以来，现在基本上所有的程序都是网络程序，很少有单机版的程序了。
+
+计算机网络就是把各个计算机连接到一起，让网络中的计算机可以互相通信。网络编程就是如何在程序中实现两台计算机的通信。
+
+举个例子，当你使用浏览器访问新浪网时，你的计算机就和新浪的某台服务器通过互联网连接起来了，然后，新浪的服务器把网页内容作为数据通过互联网传输到你的电脑上。
+
+由于你的电脑上可能不止浏览器，还有QQ、Skype、Dropbox、邮件客户端等，不同的程序连接的别的计算机也会不同，所以，更确切地说，网络通信是两台计算机上的两个进程之间的通信。比如，浏览器进程和新浪服务器上的某个Web服务进程在通信，而QQ进程是和腾讯的某个服务器上的某个进程在通信。
+
+![网络通信就是两个进程在通信](./imgs_study/网络编程.png)
+
+网络编程对所有开发语言都是一样的，Python也不例外。用Python进行网络编程，就是在Python程序本身这个进程内，连接别的服务器进程的通信端口进行通信。
+
+本章我们将详细介绍Python网络编程的概念和最主要的两种网络类型的编程。
+
+### TCP/IP简介
+
+虽然大家现在对互联网很熟悉，但是计算机网络的出现比互联网要早很多。
+
+计算机为了联网，就必须规定通信协议，早期的计算机网络，都是由各厂商自己规定一套协议，IBM、Apple和Microsoft都有各自的网络协议，互不兼容，这就好比一群人有的说英语，有的说中文，有的说德语，说同一种语言的人可以交流，不同的语言之间就不行了。
+
+为了把全世界的所有不同类型的计算机都连接起来，就必须规定一套全球通用的协议，为了实现互联网这个目标，互联网协议簇（Internet  Protocol  Suite）就是通用协议标准。Internet是由inter和net两个单词组合起来的，原意就是连接“网络”的网络，有了Internet，任何私有网络，只要支持这个协议，就可以联入互联网。
+
+因为互联网协议包含了上百种协议标准，但是最重要的两个协议是TCP和IP协议，所以，大家把互联网的协议简称TCP/IP协议。
+
+通信的时候，双方必须知道对方的标识，好比发邮件必须知道对方的邮件地址。互联网上每个计算机的唯一标识就是IP地址，类似`123.123.123.123`。如果一台计算机同时接入到两个或更多的网络，比如路由器，它就会有两个或多个IP地址，所以，IP地址对应的实际上是计算机的网络接口，通常是网卡。
+
+IP协议负责把数据从一台计算机通过网络发送到另一台计算机。数据被分割成一小块一小块，然后通过IP包发送出去。由于互联网链路复杂，两台计算机之间经常有多条线路，因此，路由器就负责决定如何把一个IP包转发出去。IP包的特点是按块发送，途径多个路由，但不保证能到达，也不保证顺序到达。
+
+![internet-computers](./imgs_study/internet-computers.png)
+
+IP地址实际上是一个32位整数（称为IPv4），以字符串表示的IP地址如`192.168.0.1`实际上是把32位整数按8位分组后的数字表示，目的是便于阅读。
+
+IPv6地址实际上是一个128位整数，它是目前使用的IPv4的升级版，以字符串表示类似于`2001:0db8:85a3:0042:1000:8a2e:0370:7334`。
+
+TCP协议则是建立在IP协议之上的。TCP协议负责在两台计算机之间建立可靠连接，保证数据包按顺序到达。TCP协议会通过握手建立连接，然后，对每个IP包编号，确保对方按顺序收到，如果包丢掉了，就自动重发。
+
+许多常用的更高级的协议都是建立在TCP协议基础上的，比如用于浏览器的HTTP协议、发送邮件的SMTP协议等。
+
+一个TCP报文除了包含要传输的数据外，还包含源IP地址和目标IP地址，源端口和目标端口。
+
+端口有什么作用？在两台计算机通信时，只发IP地址是不够的，因为同一台计算机上跑着多个网络程序。一个TCP报文来了之后，到底是交给浏览器还是QQ，就需要端口号来区分。每个网络程序都向操作系统申请唯一的端口号，这样，两个进程在两台计算机之间建立网络连接就需要各自的IP地址和各自的端口号。
+
+一个进程也可能同时与多个计算机建立链接，因此它会申请很多端口。
+
+了解了TCP/IP协议的基本概念，IP地址和端口的概念，我们就可以开始进行网络编程了。
+
+### TCP编程
+
+Socket是网络编程的一个抽象概念。通常我们用一个Socket表示“打开了一个网络链接”，而打开一个Socket需要知道目标计算机的IP地址和端口号，再指定协议类型即可。
+
+**客户端**
+
+大多数连接都是可靠的TCP连接。创建TCP连接时，主动发起连接的叫客户端，被动响应连接的叫服务器。
+
+举个例子，当我们在浏览器中访问新浪时，我们自己的计算机就是客户端，浏览器会主动向新浪的服务器发起连接。如果一切顺利，新浪的服务器接受了我们的连接，一个TCP连接就建立起来的，后面的通信就是发送网页内容了。
+
+所以，我们要创建一个基于TCP连接的Socket，可以这样做：
+
+```python
+# 导入socket库:
+import socket
+
+# 创建一个socket:
+s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+# 建立连接:
+s.connect(('www.sina.com.cn', 80))
+```
+
+创建`Socket`时，`AF_INET`指定使用IPv4协议，如果要用更先进的IPv6，就指定为`AF_INET6`。`SOCK_STREAM`指定使用面向流的TCP协议，这样，一个`Socket`对象就创建成功，但是还没有建立连接。
+
+客户端要主动发起TCP连接，必须知道服务器的IP地址和端口号。新浪网站的IP地址可以用域名`www.sina.com.cn`自动转换到IP地址，但是怎么知道新浪服务器的端口号呢？
+
+答案是作为服务器，提供什么样的服务，端口号就必须固定下来。由于我们想要访问网页，因此新浪提供网页服务的服务器必须把端口号固定在`80`端口，因为`80`端口是Web服务的标准端口。其他服务都有对应的标准端口号，例如SMTP服务是`25`端口，FTP服务是`21`端口，等等。端口号小于1024的是Internet标准服务的端口，端口号大于1024的，可以任意使用。
+
+因此，我们连接新浪服务器的代码如下：
+
+```
+s.connect(('www.sina.com.cn', 80))
+```
+
+注意参数是一个`tuple`，包含地址和端口号。
+
+建立TCP连接后，我们就可以向新浪服务器发送请求，要求返回首页的内容：
+
+```
+# 发送数据:
+s.send(b'GET / HTTP/1.1\r\nHost: www.sina.com.cn\r\nConnection: close\r\n\r\n')
+```
+
+TCP连接创建的是双向通道，双方都可以同时给对方发数据。但是谁先发谁后发，怎么协调，要根据具体的协议来决定。例如，HTTP协议规定客户端必须先发请求给服务器，服务器收到后才发数据给客户端。
+
+发送的文本格式必须符合HTTP标准，如果格式没问题，接下来就可以接收新浪服务器返回的数据了：
+
+```
+# 接收数据:
+buffer = []
+while True:
+    # 每次最多接收1k字节:
+    d = s.recv(1024)
+    if d:
+        buffer.append(d)
+    else:
+        break
+data = b''.join(buffer)
+```
+
+接收数据时，调用`recv(max)`方法，一次最多接收指定的字节数，因此，在一个while循环中反复接收，直到`recv()`返回空数据，表示接收完毕，退出循环。
+
+当我们接收完数据后，调用`close()`方法关闭Socket，这样，一次完整的网络通信就结束了：
+
+```
+# 关闭连接:
+s.close()
+```
+
+接收到的数据包括HTTP头和网页本身，我们只需要把HTTP头和网页分离一下，把HTTP头打印出来，网页内容保存到文件：
+
+```
+header, html = data.split(b'\r\n\r\n', 1)
+print(header.decode('utf-8'))
+# 把接收的数据写入文件:
+with open('sina.html', 'wb') as f:
+    f.write(html)
+```
+
+现在，只需要在浏览器中打开这个`sina.html`文件，就可以看到新浪的首页了。
+
+**服务器**
+
+和客户端编程相比，服务器编程就要复杂一些。
+
+服务器进程首先要绑定一个端口并监听来自其他客户端的连接。如果某个客户端连接过来了，服务器就与该客户端建立Socket连接，随后的通信就靠这个Socket连接了。
+
+所以，服务器会打开固定端口（比如80）监听，每来一个客户端连接，就创建该Socket连接。由于服务器会有大量来自客户端的连接，所以，服务器要能够区分一个Socket连接是和哪个客户端绑定的。一个Socket依赖4项：服务器地址、服务器端口、客户端地址、客户端端口来唯一确定一个Socket。
+
+但是服务器还需要同时响应多个客户端的请求，所以，每个连接都需要一个新的进程或者新的线程来处理，否则，服务器一次就只能服务一个客户端了。
+
+我们来编写一个简单的服务器程序，它接收客户端连接，把客户端发过来的字符串加上`Hello`再发回去。
+
+首先，创建一个基于IPv4和TCP协议的Socket：
+
+```
+s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+```
+
+然后，我们要绑定监听的地址和端口。服务器可能有多块网卡，可以绑定到某一块网卡的IP地址上，也可以用`0.0.0.0`绑定到所有的网络地址，还可以用`127.0.0.1`绑定到本机地址。`127.0.0.1`是一个特殊的IP地址，表示本机地址，如果绑定到这个地址，客户端必须同时在本机运行才能连接，也就是说，外部的计算机无法连接进来。
+
+端口号需要预先指定。因为我们写的这个服务不是标准服务，所以用`9999`这个端口号。请注意，小于`1024`的端口号必须要有管理员权限才能绑定：
+
+```
+# 监听端口:
+s.bind(('127.0.0.1', 9999))
+```
+
+紧接着，调用`listen()`方法开始监听端口，传入的参数指定等待连接的最大数量：
+
+```
+s.listen(5)
+print('Waiting for connection...')
+```
+
+接下来，服务器程序通过一个永久循环来接受来自客户端的连接，`accept()`会等待并返回一个客户端的连接:
+
+```
+while True:
+    # 接受一个新连接:
+    sock, addr = s.accept()
+    # 创建新线程来处理TCP连接:
+    t = threading.Thread(target=tcplink, args=(sock, addr))
+    t.start()
+```
+
+每个连接都必须创建新线程（或进程）来处理，否则，单线程在处理连接的过程中，无法接受其他客户端的连接：
+
+```
+def tcplink(sock, addr):
+    print('Accept new connection from %s:%s...' % addr)
+    sock.send(b'Welcome!')
+    while True:
+        data = sock.recv(1024)
+        time.sleep(1)
+        if not data or data.decode('utf-8') == 'exit':
+            break
+        sock.send(('Hello, %s!' % data.decode('utf-8')).encode('utf-8'))
+    sock.close()
+    print('Connection from %s:%s closed.' % addr)
+```
+
+连接建立后，服务器首先发一条欢迎消息，然后等待客户端数据，并加上`Hello`再发送给客户端。如果客户端发送了`exit`字符串，就直接关闭连接。
+
+要测试这个服务器程序，我们还需要编写一个客户端程序：
+
+```
+s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+# 建立连接:
+s.connect(('127.0.0.1', 9999))
+# 接收欢迎消息:
+print(s.recv(1024).decode('utf-8'))
+for data in [b'Michael', b'Tracy', b'Sarah']:
+    # 发送数据:
+    s.send(data)
+    print(s.recv(1024).decode('utf-8'))
+s.send(b'exit')
+s.close()
+```
+
+我们需要打开两个命令行窗口，一个运行服务器程序，另一个运行客户端程序，就可以看到效果了：
+
+```ascii
+┌────────────────────────────────────────────────────────┐
+│Command Prompt                                    - □ x │
+├────────────────────────────────────────────────────────┤
+│$ python echo_server.py                                 │
+│Waiting for connection...                               │
+│Accept new connection from 127.0.0.1:64398...           │
+│Connection from 127.0.0.1:64398 closed.                 │
+│                                                        │
+│       ┌────────────────────────────────────────────────┴───────┐
+│       │Command Prompt                                    - □ x │
+│       ├────────────────────────────────────────────────────────┤
+│       │$ python echo_client.py                                 │
+│       │Welcome!                                                │
+│       │Hello, Michael!                                         │
+└───────┤Hello, Tracy!                                           │
+        │Hello, Sarah!                                           │
+        │$                                                       │
+        │                                                        │
+        │                                                        │
+        └────────────────────────────────────────────────────────┘
+```
+
+需要注意的是，客户端程序运行完毕就退出了，而服务器程序会永远运行下去，必须按Ctrl+C退出程序。
+
+**小结**
+
+用TCP协议进行Socket编程在Python中十分简单，对于客户端，要主动连接服务器的IP和指定端口，对于服务器，要首先监听指定端口，然后，对每一个新的连接，创建一个线程或进程来处理。通常，服务器程序会无限运行下去。
+
+同一个端口，被一个Socket绑定了以后，就不能被别的Socket绑定了。
+
+### UDP编程
+
+TCP是建立可靠连接，并且通信双方都可以以流的形式发送数据。相对TCP，UDP则是面向无连接的协议。
+
+使用UDP协议时，不需要建立连接，只需要知道对方的IP地址和端口号，就可以直接发数据包。但是，能不能到达就不知道了。
+
+虽然用UDP传输数据不可靠，但它的优点是和TCP比，速度快，对于不要求可靠到达的数据，就可以使用UDP协议。
+
+我们来看看如何通过UDP协议传输数据。和TCP类似，使用UDP的通信双方也分为客户端和服务器。服务器首先需要绑定端口：
+
+```
+s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+# 绑定端口:
+s.bind(('127.0.0.1', 9999))
+```
+
+创建Socket时，`SOCK_DGRAM`指定了这个Socket的类型是UDP。绑定端口和TCP一样，但是不需要调用`listen()`方法，而是直接接收来自任何客户端的数据：
+
+```
+print('Bind UDP on 9999...')
+while True:
+    # 接收数据:
+    data, addr = s.recvfrom(1024)
+    print('Received from %s:%s.' % addr)
+    s.sendto(b'Hello, %s!' % data, addr)
+```
+
+`recvfrom()`方法返回数据和客户端的地址与端口，这样，服务器收到数据后，直接调用`sendto()`就可以把数据用UDP发给客户端。
+
+注意这里省掉了多线程，因为这个例子很简单。
+
+客户端使用UDP时，首先仍然创建基于UDP的Socket，然后，不需要调用`connect()`，直接通过`sendto()`给服务器发数据：
+
+```python
+s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+for data in [b'Michael', b'Tracy', b'Sarah']:
+    # 发送数据:
+    s.sendto(data, ('127.0.0.1', 9999))
+    # 接收数据:
+    print(s.recv(1024).decode('utf-8'))
+s.close()
+```
+
+从服务器接收数据仍然调用`recv()`方法。
+
+仍然用两个命令行分别启动服务器和客户端测试，结果如下：
+
+```ascii
+───────────────────────────────────────────────────────┐
+│Command Prompt                                    - □ x │
+├────────────────────────────────────────────────────────┤
+│$ python udp_server.py                                  │
+│Bind UDP on 9999...                                     │
+│Received from 127.0.0.1:63823...                        │
+│Received from 127.0.0.1:63823...                        │
+│Received from 127.0.0.1:63823...                        │
+│       ┌────────────────────────────────────────────────┴───────┐
+│       │Command Prompt                                    - □ x │
+│       ├────────────────────────────────────────────────────────┤
+│       │$ python udp_client.py                                  │
+│       │Welcome!                                                │
+│       │Hello, Michael!                                         │
+└───────┤Hello, Tracy!                                           │
+        │Hello, Sarah!                                           │
+        │$                                                       │
+        │                                                        │
+        │                                                        │
+        └────────────────────────────────────────────────────────┘
+```
+
+**小结**
+
+UDP的使用与TCP类似，但是不需要建立连接。此外，服务器绑定UDP端口和TCP端口互不冲突，也就是说，UDP的9999端口与TCP的9999端口可以各自绑定。
+
+## 电子邮件
+
+### SMTP发送邮件
+
+### POP3收取邮件
+
+## 访问数据库
+
+### 使用MySQL
+
+### 使用SQLAlchemy
+
+## Web开发
+
+### HTTP协议简介
+
+### HTML简介
+
+### WSGI简介
+
+### 使用Web框架
+
+### 使用模版
+
+## 异步IO
+
+### 协程
+
+### asyncio
+
+### async/await
+
+### aiohttp
+
+
 
 pip命令
 
