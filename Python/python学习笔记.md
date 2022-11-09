@@ -10374,7 +10374,269 @@ UDP的使用与TCP类似，但是不需要建立连接。此外，服务器绑�
 
 ### 使用MySQL
 
+MySQL是Web世界中使用最广泛的数据库服务器。SQLite的特点是轻量级、可嵌入，但不能承受高并发访问，适合桌面和移动应用。而MySQL是为服务器端设计的数据库，能承受高并发访问，同时占用的内存也远远大于SQLite。
+
+此外，MySQL内部有多种数据库引擎，最常用的引擎是支持数据库事务的InnoDB。
+
+**安装MySQL**
+
+可以直接从MySQL官方网站下载最新的[Community Server 5.6.x](http://dev.mysql.com/downloads/mysql/5.6.html)版本。MySQL是跨平台的，选择对应的平台下载安装文件，安装即可。
+
+安装时，MySQL会提示输入`root`用户的口令，请务必记清楚。如果怕记不住，就把口令设置为`password`。
+
+在Windows上，安装时请选择`UTF-8`编码，以便正确地处理中文。
+
+在Mac或Linux上，需要编辑MySQL的配置文件，把数据库默认的编码全部改为UTF-8。MySQL的配置文件默认存放在`/etc/my.cnf`或者`/etc/mysql/my.cnf`：
+
+```
+[client]
+default-character-set = utf8
+
+[mysqld]
+default-storage-engine = INNODB
+character-set-server = utf8
+collation-server = utf8_general_ci
+```
+
+重启MySQL后，可以通过MySQL的客户端命令行检查编码：
+
+```
+$ mysql -u root -p
+Enter password: 
+Welcome to the MySQL monitor...
+...
+
+mysql> show variables like '%char%';
++--------------------------+--------------------------------------------------------+
+| Variable_name            | Value                                                  |
++--------------------------+--------------------------------------------------------+
+| character_set_client     | utf8                                                   |
+| character_set_connection | utf8                                                   |
+| character_set_database   | utf8                                                   |
+| character_set_filesystem | binary                                                 |
+| character_set_results    | utf8                                                   |
+| character_set_server     | utf8                                                   |
+| character_set_system     | utf8                                                   |
+| character_sets_dir       | /usr/local/mysql-5.1.65-osx10.6-x86_64/share/charsets/ |
++--------------------------+--------------------------------------------------------+
+8 rows in set (0.00 sec)
+```
+
+看到`utf8`字样就表示编码设置正确。
+
+*注*：如果MySQL的版本≥5.5.3，可以把编码设置为`utf8mb4`，`utf8mb4`和`utf8`完全兼容，但它支持最新的Unicode标准，可以显示emoji字符。
+
+**安装MySQL驱动**
+
+由于MySQL服务器以独立的进程运行，并通过网络对外服务，所以，需要支持Python的MySQL驱动来连接到MySQL服务器。MySQL官方提供了mysql-connector-python驱动，但是安装的时候需要给pip命令加上参数`--allow-external`：
+
+```
+$ pip install mysql-connector-python --allow-external mysql-connector-python
+```
+
+如果上面的命令安装失败，可以试试另一个驱动：
+
+```
+$ pip install mysql-connector
+```
+
+我们演示如何连接到MySQL服务器的test数据库：
+
+```
+# 导入MySQL驱动:
+>>> import mysql.connector
+# 注意把password设为你的root口令:
+>>> conn = mysql.connector.connect(user='root', password='password', database='test')
+>>> cursor = conn.cursor()
+# 创建user表:
+>>> cursor.execute('create table user (id varchar(20) primary key, name varchar(20))')
+# 插入一行记录，注意MySQL的占位符是%s:
+>>> cursor.execute('insert into user (id, name) values (%s, %s)', ['1', 'Michael'])
+>>> cursor.rowcount
+1
+# 提交事务:
+>>> conn.commit()
+>>> cursor.close()
+# 运行查询:
+>>> cursor = conn.cursor()
+>>> cursor.execute('select * from user where id = %s', ('1',))
+>>> values = cursor.fetchall()
+>>> values
+[('1', 'Michael')]
+# 关闭Cursor和Connection:
+>>> cursor.close()
+True
+>>> conn.close()
+```
+
+由于Python的DB-API定义都是通用的，所以，操作MySQL的数据库代码和SQLite类似。
+
+**小结**
+
+- 执行INSERT等操作后要调用`commit()`提交事务；
+- MySQL的SQL占位符是`%s`。
+
 ### 使用SQLAlchemy
+
+数据库表是一个二维表，包含多行多列。把一个表的内容用Python的数据结构表示出来的话，可以用一个list表示多行，list的每一个元素是tuple，表示一行记录，比如，包含`id`和`name`的`user`表：
+
+```
+[
+    ('1', 'Michael'),
+    ('2', 'Bob'),
+    ('3', 'Adam')
+]
+```
+
+Python的DB-API返回的数据结构就是像上面这样表示的。
+
+但是用tuple表示一行很难看出表的结构。如果把一个tuple用class实例来表示，就可以更容易地看出表的结构来：
+
+```python
+class User(object):
+    def __init__(self, id, name):
+        self.id = id
+        self.name = name
+
+[
+  User('1', 'Michael'),
+  User('2', 'Bob'),
+  User('3', 'Adam')
+]
+```
+
+这就是传说中的ORM技术：Object-Relational Mapping，把关系数据库的表结构映射到对象上。是不是很简单？
+
+但是由谁来做这个转换呢？所以ORM框架应运而生。
+
+在Python中，最有名的ORM框架是SQLAlchemy。我们来看看SQLAlchemy的用法。
+
+首先通过pip安装SQLAlchemy：
+
+```
+$ pip install sqlalchemy
+```
+
+然后，利用上次我们在MySQL的test数据库中创建的`user`表，用SQLAlchemy来试试：
+
+第一步，导入SQLAlchemy，并初始化DBSession
+
+```python
+from sqlalchemy import Column, String, create_engine
+from sqlalchemy.orm import sessionmaker
+from sqlalchemy.ext.declarative import declarative_base
+
+#创建对象的基类
+Base = declarative_base()
+
+
+class User(Base):
+    # 表的名字
+    __tablename__ = 'user'
+
+    # 表的结构
+    id = Column(String(20), primary_key=True)
+    name = Column(String(20))
+
+
+# 初始化数据库连接
+engine = create_engine('mysql+mysqlconnector://user:123456@172.16.218.103:3306/test')
+# 创建DBSession类型
+DBSession = sessionmaker(bind=engine)
+```
+
+以上代码完成SQLAlchemy的初始化和具体每个表的class定义。如果有多个表，就继续定义其他class，例如School：
+
+```python
+class School(Base):
+    __tablename__ = 'school'
+    id = ...
+    name = ...
+```
+
+`create_engine()`用来初始化数据库连接。SQLAlchemy用一个字符串表示连接信息：
+
+```
+'数据库类型+数据库驱动名称://用户名:口令@机器地址:端口号/数据库名'
+```
+
+你只需要根据需要替换掉用户名、口令等信息即可。
+
+下面，我们看看如何向数据库表中添加一行记录。
+
+由于有了ORM，我们向数据库表中添加一行记录，可以视为添加一个`User`对象：
+
+```python
+# 创建session对象:
+session = DBSession()
+# 创建新User对象:
+new_user = User(id='5', name='Bob')
+# 添加到session:
+session.add(new_user)
+# 提交即保存到数据库:
+session.commit()
+# 关闭session:
+session.close()
+```
+
+可见，关键是获取session，然后把对象添加到session，最后提交并关闭。`DBSession`对象可视为当前数据库连接。
+
+如何从数据库表中查询数据呢？有了ORM，查询出来的可以不再是tuple，而是`User`对象。SQLAlchemy提供的查询接口如下：
+
+```python
+# 创建Session:
+session = DBSession()
+# 创建Query查询，filter是where条件，最后调用one()返回唯一行，如果调用all()则返回所有行:
+user = session.query(User).filter(User.id=='5').one()
+# 打印类型和对象的name属性:
+print('type:', type(user))
+print('name:', user.name)
+# 关闭Session:
+session.close()
+```
+
+运行结果如下：
+
+```
+type: <class '__main__.User'>
+name: Michael
+```
+
+可见，ORM就是把数据库表的行与相应的对象建立关联，互相转换。
+
+由于关系数据库的多个表还可以用外键实现一对多、多对多等关联，相应地，ORM框架也可以提供两个对象之间的一对多、多对多等功能。
+
+例如，如果一个User拥有多个Book，就可以定义一对多关系如下：
+
+```python
+from sqlalchemy import Column, String, create_engine, ForeignKey
+from sqlalchemy.orm import sessionmaker, relationship
+from sqlalchemy.ext.declarative import declarative_base
+
+class User(Base):
+    __tablename__ = 'user'
+
+    id = Column(String(20), primary_key=True)
+    name = Column(String(20))
+    # 一对多:
+    books = relationship('Book')
+
+class Book(Base):
+    __tablename__ = 'book'
+
+    id = Column(String(20), primary_key=True)
+    name = Column(String(20))
+    # “多”的一方的book表是通过外键关联到user表的:
+    user_id = Column(String(20), ForeignKey('user.id'))
+```
+
+当我们查询一个User对象时，该对象的books属性将返回一个包含若干个Book对象的list。
+
+**小结**
+
+ORM框架的作用就是把数据库表的一行记录与一个对象互相做自动转换。
+
+正确使用ORM的前提是了解关系数据库的原理。
 
 ## Web开发
 
@@ -10383,6 +10645,85 @@ UDP的使用与TCP类似，但是不需要建立连接。此外，服务器绑�
 ### HTML简介
 
 ### WSGI简介
+
+WSGI：Web Server Gateway Interface。
+
+WSGI接口定义非常简单，它只要求Web开发者实现一个函数，就可以响应HTTP请求。我们来看一个最简单的Web版本的“Hello, web!”：
+
+```python
+def application(environ, start_response):
+    start_response('200 OK', [('Content-Type', 'text/html')])
+    return [b'<h1>Hello, web!</h1>']
+```
+
+上面的`application()`函数就是符合WSGI标准的一个HTTP处理函数，它接收两个参数：
+
+- environ：一个包含所有HTTP请求信息的`dict`对象；
+- start_response：一个发送HTTP响应的函数。
+
+在`application()`函数中，调用：
+
+```
+start_response('200 OK', [('Content-Type', 'text/html')])
+```
+
+就发送了HTTP响应的Header，注意Header只能发送一次，也就是只能调用一次`start_response()`函数。`start_response()`函数接收两个参数，一个是HTTP响应码，一个是一组`list`表示的HTTP Header，每个Header用一个包含两个`str`的`tuple`表示。
+
+通常情况下，都应该把`Content-Type`头发送给浏览器。其他很多常用的HTTP Header也应该发送。
+
+然后，函数的返回值`b'Hello, web!'`将作为HTTP响应的Body发送给浏览器。
+
+有了WSGI，我们关心的就是如何从`environ`这个`dict`对象拿到HTTP请求信息，然后构造HTML，通过`start_response()`发送Header，最后返回Body。
+
+整个`application()`函数本身没有涉及到任何解析HTTP的部分，也就是说，底层代码不需要我们自己编写，我们只负责在更高层次上考虑如何响应请求就可以了。
+
+不过，等等，这个`application()`函数怎么调用？如果我们自己调用，两个参数`environ`和`start_response`我们没法提供，返回的`bytes`也没法发给浏览器。
+
+所以`application()`函数必须由WSGI服务器来调用。有很多符合WSGI规范的服务器，我们可以挑选一个来用。但是现在，我们只想尽快测试一下我们编写的`application()`函数真的可以把HTML输出到浏览器，所以，要赶紧找一个最简单的WSGI服务器，把我们的Web应用程序跑起来。
+
+好消息是Python内置了一个WSGI服务器，这个模块叫wsgiref，它是用纯Python编写的WSGI服务器的参考实现。所谓“参考实现”是指该实现完全符合WSGI标准，但是不考虑任何运行效率，仅供开发和测试使用。
+
+**运行WSGI服务**
+
+我们先编写`hello.py`，实现Web应用程序的WSGI处理函数：
+
+```python
+# hello.py
+
+def application(environ, start_response):
+    start_response('200 OK', [('Content-Type', 'text/html')])
+    return [b'<h1>Hello, web!</h1>']
+```
+
+然后，再编写一个`server.py`，负责启动WSGI服务器，加载`application()`函数：
+
+```python
+# server.py
+# 从wsgiref模块导入:
+from wsgiref.simple_server import make_server
+# 导入我们自己编写的application函数:
+from hello import application
+
+# 创建一个服务器，IP地址为空，端口是8000，处理函数是application:
+httpd = make_server('', 8000, application)
+print('Serving HTTP on port 8000...')
+# 开始监听HTTP请求:
+httpd.serve_forever()
+```
+
+确保以上两个文件在同一个目录下，然后在命令行输入`python server.py`来启动WSGI服务器：
+
+注意：如果`8000`端口已被其他程序占用，启动将失败，请修改成其他端口。
+
+启动成功后，打开浏览器，输入`http://localhost:8000/`，就可以看到结果了
+
+![wsgi-hello](./imgs/wsgi-hello.png)在命
+
+令行可以看到wsgiref打印的log信息：
+
+
+
+
 
 ### 使用Web框架
 
